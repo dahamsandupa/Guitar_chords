@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guitar Chords Pro - Ultimate Edition</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+        :root { --primary: #1a2a3a; --accent: #3498db; --success: #2ecc71; --bg: #f8f9fa; --warning: #f39c12; --chrome: #4285f4; --sync: #8e44ad; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); margin: 0; padding: 0; }
+        
+        /* Navigation */
+        .navbar { background: var(--primary); display: flex; justify-content: center; padding: 10px 0; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+        .tab-btn { background: none; border: none; color: white; padding: 12px 25px; cursor: pointer; font-size: 1.1rem; font-weight: bold; border-radius: 5px; text-transform: uppercase; margin: 0 5px; transition: 0.3s; }
+        .tab-btn.active { background: var(--accent); }
+        
+        .container { max-width: 1100px; margin: 30px auto; padding: 0 20px; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        /* Cards */
+        .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 25px rgba(0,0,0,0.1); margin-bottom: 25px; position: relative; }
+        input, textarea { padding: 15px; border: 2px solid #ddd; border-radius: 8px; width: 100%; font-size: 1.1rem; box-sizing: border-box; margin-bottom: 15px; }
+        
+        /* Display Area */
+        #captureArea { background: white; padding: 40px; border: 1px solid #eee; border-radius: 10px; }
+        .export-song-title { font-size: 3.5rem; font-weight: 900; color: #000; text-align: center; margin-bottom: 30px; text-transform: uppercase; border-bottom: 8px solid #000; padding-bottom: 15px; cursor: pointer; }
+        
+        .section-block { margin-top: 40px; border-bottom: 2px dashed #eee; padding-bottom: 30px; position: relative; }
+        .display-section-label { color: #fff; background: #333; font-size: 1.6rem; font-weight: bold; padding: 8px 20px; border-radius: 5px; display: inline-block; margin-bottom: 20px; cursor: pointer; }
+        
+        .chord-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+        .chord-item { display: flex; align-items: center; border-left: 6px solid #ddd; padding-left: 15px; cursor: pointer; min-height: 80px; }
+        .chord-box { font-size: 3.2rem; font-family: 'Courier New', monospace; color: #000; font-weight: bold; letter-spacing: -1px; }
+        .chord-box span.sup { font-size: 1.6rem; vertical-align: super; color: #e67e22; }
+
+        .inline-edit-input { font-size: 2.5rem; width: 160px; font-weight: bold; font-family: 'Courier New', monospace; border: 3px solid var(--accent); text-align: center; }
+
+        /* Buttons */
+        .btn { padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; text-transform: uppercase; transition: 0.3s; }
+        .btn-add { background: var(--accent); color: white; width: 100%; }
+        .btn-save { background: var(--success); color: white; width: 100%; margin-top: 15px; }
+        .btn-pdf { background: #e74c3c; color: white; flex: 1; }
+        .btn-img { background: #e67e22; color: white; flex: 1; }
+        .btn-chrome { background: var(--chrome); color: white; width: 100%; margin-bottom: 15px; }
+        .btn-del { background: #ff4d4d; color: white; font-size: 0.8rem; padding: 8px 15px; }
+        .btn-edit { background: var(--warning); color: white; font-size: 0.8rem; padding: 8px 15px; margin-right: 5px; }
+        .btn-sync { background: var(--sync); color: white; flex: 1; }
+
+        #libSearch { border: 4px solid var(--accent); padding: 15px; font-size: 1.2rem; margin-bottom: 20px; border-radius: 50px; text-align: center; }
+        .sync-panel { display: flex; gap: 10px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="navbar">
+    <button id="addTabBtn" class="tab-btn active" onclick="openTab('addTab', this)">Editor</button>
+    <button id="libTabBtn" class="tab-btn" onclick="openTab('libraryTab', this)">Library</button>
+</div>
+
+<div class="container">
+    <div id="addTab" class="tab-content active">
+        <div class="card">
+            <h3>1. Song Name</h3>
+            <input type="text" id="songName" placeholder="Enter Song Name...">
+            <button class="btn btn-add" onclick="createNewSong()">Create</button>
+        </div>
+
+        <div class="card" id="sectionInputArea" style="display:none;">
+            <h3>2. Add Part</h3>
+            <p>Editing: <b id="currentActiveSong" style="color:var(--accent)">-</b></p>
+            <input type="text" id="sectionName" placeholder="Section Name (Ex: Intro)">
+            <textarea id="bulkChords" rows="2" placeholder="Chords: [G Dm/C Am F//"></textarea>
+            <button class="btn btn-add" onclick="addSectionToCurrent()">Add Part</button>
+        </div>
+
+        <div id="previewArea" style="display:none;">
+            <div class="card">
+                <div id="captureArea">
+                    <div id="previewTitle" class="export-song-title" onclick="editSongNameInPreview(this)"></div>
+                    <div id="sectionsContainer"></div>
+                </div>
+                
+                <div style="display:flex; gap:10px; margin-top:20px;">
+                    <button class="btn btn-pdf" onclick="downloadPDF()">📄 PDF</button>
+                    <button class="btn btn-img" onclick="downloadImage()">📸 IMAGE</button>
+                </div>
+                
+                <button class="btn btn-save" onclick="saveToLibrary()">💾 SAVE TO LIBRARY</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="libraryTab" class="tab-content">
+        <button class="btn btn-chrome" onclick="exportAsChromeFile()">🌐 Export as Chrome HTML File</button>
+        
+        <div class="sync-panel">
+            <button class="btn btn-sync" onclick="copySyncCode()">📤 Copy Sync Code</button>
+            <button class="btn btn-sync" style="background:#2c3e50" onclick="pasteSyncCode()">📥 Paste Sync Code</button>
+        </div>
+
+        <input type="text" id="libSearch" placeholder="🔍 Search songs..." onkeyup="renderLibrary()">
+        <div id="libraryList"></div>
+    </div>
+</div>
+
+<script>
+    const STORAGE_KEY = 'GuitarChords_Ultimate_V50';
+    let currentSong = { name: "", sections: [] };
+    let savedSongs = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    let editingIdx = -1;
+
+    function openTab(tabId, btn) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        btn.classList.add('active');
+        if(tabId === 'libraryTab') renderLibrary();
+    }
+
+    function createNewSong() {
+        const name = document.getElementById('songName').value.trim();
+        if(!name) return;
+        editingIdx = -1;
+        currentSong = { name, sections: [] };
+        refreshEditor();
+    }
+
+    function refreshEditor() {
+        document.getElementById('currentActiveSong').innerText = currentSong.name;
+        document.getElementById('previewTitle').innerText = currentSong.name;
+        document.getElementById('sectionInputArea').style.display = 'block';
+        document.getElementById('previewArea').style.display = 'block';
+        renderPreview();
+    }
+
+    function addSectionToCurrent() {
+        const name = document.getElementById('sectionName').value.trim();
+        const raw = document.getElementById('bulkChords').value.trim();
+        if(!name || !raw) return;
+        const chordList = raw.split(/\s+/).map(c => ({
+            text: c.replace('[', '').replace('//', ''),
+            startRep: c.startsWith('['),
+            endRep: c.endsWith('//')
+        }));
+        currentSong.sections.push({ name, chords: chordList });
+        renderPreview();
+        document.getElementById('sectionName').value = "";
+        document.getElementById('bulkChords').value = "";
+    }
+
+    function renderPreview() {
+        const container = document.getElementById('sectionsContainer');
+        container.innerHTML = currentSong.sections.map((sec, sIdx) => `
+            <div class="section-block">
+                <button class="btn btn-del" style="float:right" onclick="removeSection(${sIdx})">X</button>
+                <div class="display-section-label" onclick="editSectionNameInPreview(${sIdx}, this)">${sec.name}</div>
+                <div class="chord-grid">
+                    ${sec.chords.map((c, cIdx) => `
+                        <div class="chord-item" onclick="editSingleChord(${sIdx}, ${cIdx}, this)">
+                            <div class="chord-box">${formatChord(c.text)}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function formatChord(chord) {
+        return chord.includes('/') ? chord.split('/').map(p => applySup(p)).join('/') : applySup(chord);
+    }
+
+    function applySup(chord) {
+        let match = chord.match(/^([A-G][#b]?)(.*)/);
+        return match ? `${match[1]}${match[2] ? `<span class="sup">${match[2]}</span>` : ''}` : chord;
+    }
+
+    function editSingleChord(sIdx, cIdx, element) {
+        const currentText = currentSong.sections[sIdx].chords[cIdx].text;
+        element.onclick = null;
+        element.innerHTML = `<input type="text" class="inline-edit-input" value="${currentText}" onblur="confirmChordEdit(${sIdx}, ${cIdx}, this)" onkeydown="if(event.key==='Enter') this.blur()">`;
+        element.querySelector('input').focus();
+    }
+    function confirmChordEdit(sIdx, cIdx, input) {
+        currentSong.sections[sIdx].chords[cIdx].text = input.value.trim();
+        renderPreview();
+    }
+
+    function editSectionNameInPreview(sIdx, element) {
+        const currentName = currentSong.sections[sIdx].name;
+        element.onclick = null;
+        element.innerHTML = `<input type="text" class="inline-edit-input" style="font-size:1.2rem; width:150px;" value="${currentName}" onblur="confirmSectionName(${sIdx}, this)" onkeydown="if(event.key==='Enter') this.blur()">`;
+        element.querySelector('input').focus();
+    }
+    function confirmSectionName(sIdx, input) {
+        currentSong.sections[sIdx].name = input.value.trim() || "Section";
+        renderPreview();
+    }
+
+    function editSongNameInPreview(element) {
+        const currentName = currentSong.name;
+        element.onclick = null;
+        element.innerHTML = `<input type="text" class="inline-edit-input" style="width:80%;" value="${currentName}" onblur="confirmSongName(this)" onkeydown="if(event.key==='Enter') this.blur()">`;
+        element.querySelector('input').focus();
+    }
+    function confirmSongName(input) {
+        currentSong.name = input.value.trim() || "Untitled";
+        refreshEditor();
+    }
+
+    function removeSection(idx) {
+        currentSong.sections.splice(idx, 1);
+        renderPreview();
+    }
+
+    function saveToLibrary() {
+        if(currentSong.sections.length === 0) return;
+        if(editingIdx > -1) savedSongs[editingIdx] = JSON.parse(JSON.stringify(currentSong));
+        else savedSongs.push(JSON.parse(JSON.stringify(currentSong)));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(savedSongs));
+        alert("Saved!");
+        location.reload();
+    }
+
+    function renderLibrary() {
+        const list = document.getElementById('libraryList');
+        const q = document.getElementById('libSearch').value.toLowerCase();
+        const filtered = savedSongs.filter(s => s.name.toLowerCase().includes(q));
+        list.innerHTML = filtered.map((song, idx) => `
+            <div class="card" style="border-left: 10px solid var(--accent);">
+                <div style="float:right">
+                    <button class="btn btn-edit" onclick="loadForEdit(${savedSongs.indexOf(song)})">EDIT</button>
+                    <button class="btn btn-del" onclick="deleteFromLib(${savedSongs.indexOf(song)})">X</button>
+                </div>
+                <div class="export-song-title" style="font-size:2rem; text-align:left; border-bottom:3px solid #333;">${song.name}</div>
+            </div>
+        `).join('');
+    }
+
+    function loadForEdit(idx) {
+        editingIdx = idx;
+        currentSong = JSON.parse(JSON.stringify(savedSongs[idx]));
+        document.getElementById('songName').value = currentSong.name;
+        refreshEditor();
+        openTab('addTab', document.getElementById('addTabBtn'));
+    }
+
+    function deleteFromLib(idx) {
+        if(confirm("Delete?")) { savedSongs.splice(idx, 1); localStorage.setItem(STORAGE_KEY, JSON.stringify(savedSongs)); renderLibrary(); }
+    }
+
+    // --- DOWNLOAD & SYNC LOGIC ---
+    function downloadPDF() {
+        const { jsPDF } = window.jspdf;
+        html2canvas(document.getElementById('captureArea'), { scale: 2 }).then(canvas => {
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 10, 210, (canvas.height * 210) / canvas.width);
+            pdf.save(currentSong.name + ".pdf");
+        });
+    }
+
+    function downloadImage() {
+        html2canvas(document.getElementById('captureArea'), { scale: 2 }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = currentSong.name + '.jpg';
+            link.href = canvas.toDataURL("image/jpeg", 0.9);
+            link.click();
+        });
+    }
+
+    function copySyncCode() {
+        const code = btoa(unescape(encodeURIComponent(JSON.stringify(savedSongs))));
+        navigator.clipboard.writeText(code).then(() => alert("Code Copied! WhatsApp this to your phone."));
+    }
+
+    function pasteSyncCode() {
+        const code = prompt("Paste the code from WhatsApp:");
+        if(!code) return;
+        try {
+            savedSongs = JSON.parse(decodeURIComponent(escape(atob(code))));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(savedSongs));
+            renderLibrary();
+            alert("Sync Complete!");
+        } catch(e) { alert("Invalid Code!"); }
+    }
+
+    function exportAsChromeFile() {
+        let htmlContent = `<html><head><meta charset="UTF-8"><title>My Songbook</title><style>
+            body { font-family: sans-serif; background: #f0f0f0; padding: 20px; }
+            .card { background: white; padding: 30px; margin-bottom: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+            .title { font-size: 2.5rem; font-weight: bold; border-bottom: 5px solid black; margin-bottom: 20px; text-align: center; }
+            .section { margin-top: 25px; }
+            .label { background: #333; color: white; padding: 5px 15px; border-radius: 5px; display: inline-block; font-weight: bold; }
+            .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 15px; }
+            .chord { font-size: 2.8rem; font-weight: bold; font-family: monospace; border-left: 5px solid #3498db; padding-left: 10px; }
+            .sup { font-size: 1.4rem; vertical-align: super; color: orange; }
+        </style></head><body>`;
+        savedSongs.forEach(song => {
+            htmlContent += `<div class="card"><div class="title">${song.name}</div>`;
+            song.sections.forEach(sec => {
+                htmlContent += `<div class="section"><div class="label">${sec.name}</div><div class="grid">`;
+                sec.chords.forEach(c => { htmlContent += `<div class="chord">${formatChord(c.text)}</div>`; });
+                htmlContent += `</div></div>`;
+            });
+            htmlContent += `</div>`;
+        });
+        htmlContent += `</body></html>`;
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'My_Songbook.html';
+        a.click();
+    }
+</script>
+</body>
+</html>
